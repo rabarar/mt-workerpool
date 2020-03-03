@@ -1,5 +1,7 @@
 #include <queue>
 #include <pthread.h>
+#include <sys/time.h>
+#include <sys/errno.h>
 
 #include "TaskQueue.h"
 
@@ -46,6 +48,19 @@ block()
 		pthread_cond_wait(&cv, &mu);
 }
 
+int
+TaskQueue::
+block_to()
+{
+		struct timeval tv;
+		struct timespec ts;
+		gettimeofday(&tv, NULL);
+		ts.tv_sec = tv.tv_sec + 2;
+		ts.tv_nsec = 0;
+
+		return pthread_cond_timedwait(&cv, &mu, &ts);
+}
+
 void
 TaskQueue::
 enQueue(TaskEvent_t *te)
@@ -60,14 +75,26 @@ TaskEvent_t *
 TaskQueue::
 deQueue()
 {
-		TaskEvent_t *te;
+		TaskEvent_t *te = NULL;
 		lock();
+		bool timedout = false;
 		while(taskQueue.empty()) {
-				block();
+				int rc = block_to();
+				if (rc == ETIMEDOUT) {
+						fprintf(stderr, "wait block: timedout\n");
+						timedout = true;
+						break;
+				} else if (rc == EINVAL) {
+						fprintf(stderr, "EINVAL on conditional block with timeout, aborting\n");
+						exit(-1);
+				}
 		}
-		te = taskQueue.front();
-		taskQueue.pop();
-		signal();
+
+		if (!timedout)  {
+				te = taskQueue.front();
+				taskQueue.pop();
+				signal();
+		}
 		unlock();
 
 		return te;

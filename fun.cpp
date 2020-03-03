@@ -1,5 +1,14 @@
 #include <pthread.h>
 #include <unistd.h>
+#include<stdio.h>
+#include <sys/mman.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <signal.h>
 
 #include <queue>
 #include <vector>
@@ -17,6 +26,28 @@
 
 using namespace std;
 
+sig_atomic_t volatile done = 0;
+void sig_handler(int signo, siginfo_t *info, void *extra)
+{
+		fprintf(stdout, "signal handler: ...\n");
+		done = 1;
+}
+
+void set_sig_handler(void)
+{
+        struct sigaction action;
+
+
+        action.sa_flags = SA_SIGINFO;
+        action.sa_sigaction = sig_handler;
+
+        if (sigaction(SIGINT, &action, NULL) == -1) {
+			fprintf(stdout, "err: signal handler\n");
+            exit(1);
+        }
+
+}
+
 void *eventHandler(void *args) {
 		long d = (long)args;
 		fprintf(stdout, "handler: args - %ld ...\n", d);
@@ -31,8 +62,14 @@ void *task(void *args) {
 		WorkerPool *pool = pargs->pool;
 
 		while (1) {
+
+				if (done) {
+						fprintf(stderr, "interrupt worker task terinating - no more workers\n");
+						pthread_exit(NULL);
+				}
+
 				TaskEvent_t *tv = tqueue->deQueue();
-				if (tv->type == STOP) {
+				if (tv == NULL || tv->type == STOP) {
 						fprintf(stdout, "received STOP event on pool - %s \n", targs->name.c_str());
 						pool->delWorker();
 						pthread_exit(NULL);
@@ -58,7 +95,16 @@ void *dispatcher(void *args) {
 
 		while (1) {
 
-				if (pool->getNumWorkers() == 0) {
+				if (done) {
+						fprintf(stderr, "interrupt dispatcher terinating - no more workers\n");
+						pthread_exit(NULL);
+				}
+
+				pool->lock();
+				int numWorkers = pool->getNumWorkers();
+				pool->unlock();
+
+				if (numWorkers == 0) {
 						fprintf(stderr, "dispatcher terinating - no more workers\n");
 						pthread_exit(NULL);
 				}
@@ -77,14 +123,23 @@ void *dispatcher(void *args) {
 						}
 				evNo++;
 
-				fprintf(stdout, "add event to pool- %s \n", targs->name.c_str());
-				tqueue->enQueue(te);
+				// only add if there are more than 0 workers 
+				pool->lock();
+				numWorkers = pool->getNumWorkers();
+				if  (numWorkers > 0) {
+						fprintf(stdout, "%d workers: add event to pool - %s \n", numWorkers, targs->name.c_str());
+						tqueue->enQueue(te);
+				}
+				pool->unlock();
 
 				usleep(MSECS*500);
 		}
 };
 
 int main(int argc, char *argv[]) {
+
+		// set the signal handler
+		set_sig_handler();
 
 		// create a task q
 		TaskQueue *tq = new TaskQueue();

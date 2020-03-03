@@ -25,6 +25,7 @@ class WorkerPool {
 				int numWorkers;
 				vector<TaskProc*> procTable;
 				pthread_mutex_t pm;
+				pthread_cond_t cv;
 
 
 		public:
@@ -34,6 +35,11 @@ class WorkerPool {
 				~WorkerPool();
 				void wait(void);
 				void shutdown();
+				void lock();
+				void unlock();
+				void block();
+				void block_to();
+				void signal();
 };
 
 

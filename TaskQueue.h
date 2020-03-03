@@ -21,6 +21,7 @@ class TaskQueue {
 				void unlock();
 				void signal();
 				void block();
+				int block_to();
 		public:
 				TaskQueue();
 				~TaskQueue();

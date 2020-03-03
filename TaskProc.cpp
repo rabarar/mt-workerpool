@@ -23,8 +23,15 @@ join()
 {
 		fprintf(stderr, "joining thread [%s]\n", name.c_str());
 		pthread_join(thread, &exit_status);
-};
+}
 
+
+void
+TaskProc::
+terminate(void)
+{
+		pthread_cancel(thread);
+}
 
 TaskProc::
 ~TaskProc()

@@ -25,7 +25,7 @@ class TaskProc {
 		public:
 			TaskProc(string name, void *(*handler)(void*), TaskArgs_t *args);
 			~TaskProc();
-			int terminate(void *status);
+			void terminate(void);
 			void join();
 };
 
