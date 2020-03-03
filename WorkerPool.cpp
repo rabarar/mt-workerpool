@@ -1,9 +1,13 @@
 #include <sys/time.h>
+#include <unistd.h>
+
 
 #include "WorkerPool.h"
+#include "Events.h"
+#include "utils.h"
 
 WorkerPool::
-WorkerPool(int numWorkers, void *(*task)(void*), void *(*dispatcher)(void *), PoolArgs_t *args)
+WorkerPool(int numWorkers, PoolArgs_t *args)
 {
 
 		this->numWorkers = numWorkers;
@@ -119,5 +123,88 @@ block_to()
 		ts.tv_nsec = 0;
 
 		int rc = pthread_cond_timedwait(&cv, &pm, &ts);
+}
+
+static void *task(void *args)
+{
+		TaskArgs* targs = (TaskArgs*)args;
+		PoolArgs* pargs = (PoolArgs *)(targs->args);
+		TaskQueue *tqueue = pargs->src_queue;
+		
+		WorkerPool *pool = pargs->pool;
+
+		while (1) {
+
+				if (done) {
+						fprintf(stderr, "interrupt worker task terinating - no more workers\n");
+						pthread_exit(NULL);
+				}
+
+				TaskEvent_t *tv = tqueue->deQueue();
+				if (tv == NULL || tv->type == STOP) {
+						fprintf(stdout, "received STOP event on pool - %s \n", targs->name.c_str());
+						pool->delWorker();
+						pthread_exit(NULL);
+
+				} else {
+						fprintf(stdout, "received event on pool - %s \n", targs->name.c_str());
+						tv->handler(tv->args);
+						delete(tv);
+				}
+				
+
+				usleep(MSECS*500);
+		}
+}
+
+static void *dispatcher(void *args)
+{
+		TaskArgs_t *targs = (TaskArgs_t *)args;
+		PoolArgs* pargs = (PoolArgs *)(targs->args);
+		TaskQueue *tqueue = pargs->src_queue;
+		static long evNo = 0;
+
+		WorkerPool *pool = pargs->pool;
+
+		while (1) {
+
+				if (done) {
+						fprintf(stderr, "interrupt dispatcher terinating - no more workers\n");
+						pthread_exit(NULL);
+				}
+
+				pool->lock();
+				int numWorkers = pool->getNumWorkers();
+				pool->unlock();
+
+				if (numWorkers == 0) {
+						fprintf(stderr, "dispatcher terinating - no more workers\n");
+						pthread_exit(NULL);
+				}
+
+				TaskEvent *te = new TaskEvent();
+				if (evNo >= 10) {
+						te->handler = NULL;
+						te->args = NULL;
+						te->type = STOP;
+
+						
+				} else {
+						te->handler = eventHandler;
+						te->args = (void *)(long(evNo));
+						te->type = GENERIC;
+						}
+				evNo++;
+
+				// only add if there are more than 0 workers 
+				pool->lock();
+				numWorkers = pool->getNumWorkers();
+				if  (numWorkers > 0) {
+						fprintf(stdout, "%d workers: add event to pool - %s \n", numWorkers, targs->name.c_str());
+						tqueue->enQueue(te);
+				}
+				pool->unlock();
+				usleep(MSECS*500);
+		}
 }
 

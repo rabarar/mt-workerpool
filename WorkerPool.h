@@ -7,6 +7,7 @@
 
 #include "TaskProc.h"
 #include "TaskQueue.h"
+#include "usignal.h"
 
 using namespace std;
 
@@ -14,9 +15,14 @@ class WorkerPool;
 
 typedef struct PoolArgs {
 	string name;
-	TaskQueue *queue;
+	TaskQueue *src_queue;
+	TaskQueue *syn_queue;
 	WorkerPool *pool;
 } PoolArgs_t;
+
+static void *dispatcher(void*); 
+static void *task(void*);
+
 
 class WorkerPool {
 		private:
@@ -27,11 +33,10 @@ class WorkerPool {
 				pthread_mutex_t pm;
 				pthread_cond_t cv;
 
-
 		public:
 				int getNumWorkers();
 				void delWorker();
-				WorkerPool(int numWorkers, void *(*task)(void*),void *(*dispatcher)(void*), PoolArgs_t *args);
+				WorkerPool(int numWorkers,PoolArgs_t *args);
 				~WorkerPool();
 				void wait(void);
 				void shutdown();

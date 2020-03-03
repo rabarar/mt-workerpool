@@ -5,3 +5,5 @@ typedef enum {
 		GENERIC,
 		NUM_EVENTS
 } Event_t;
+
+void *eventHandler(void *args);
