@@ -1,5 +1,6 @@
 #pragma once
 
+
 typedef enum {
 		STOP = 0,
 		GENERIC,
@@ -7,3 +8,10 @@ typedef enum {
 } Event_t;
 
 void *eventHandler(void *args);
+
+class Eventor {
+		private:
+		public:
+				Eventor();
+				~Eventor();
+};

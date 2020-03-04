@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
 
 		fprintf(stderr, "starting...\n");
 
-		WorkerPool pool(5, &poolArgs);
+		WorkerPool pool(500, &poolArgs);
 		
 		delete(tq_src);
 		delete(tq_syn);

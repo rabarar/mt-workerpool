@@ -129,7 +129,6 @@ static void *task(void *args)
 {
 		TaskArgs* targs = (TaskArgs*)args;
 		PoolArgs* pargs = (PoolArgs *)(targs->args);
-		TaskQueue *tqueue = pargs->src_queue;
 		
 		WorkerPool *pool = pargs->pool;
 
@@ -140,7 +139,7 @@ static void *task(void *args)
 						pthread_exit(NULL);
 				}
 
-				TaskEvent_t *tv = tqueue->deQueue();
+				TaskEvent_t *tv = pargs->src_queue->deQueue();
 				if (tv == NULL || tv->type == STOP) {
 						fprintf(stdout, "received STOP event on pool - %s \n", targs->name.c_str());
 						pool->delWorker();
@@ -153,7 +152,7 @@ static void *task(void *args)
 				}
 				
 
-				usleep(MSECS*500);
+				usleep(MICSECS*50);
 		}
 }
 
@@ -161,7 +160,7 @@ static void *dispatcher(void *args)
 {
 		TaskArgs_t *targs = (TaskArgs_t *)args;
 		PoolArgs* pargs = (PoolArgs *)(targs->args);
-		TaskQueue *tqueue = pargs->src_queue;
+
 		static long evNo = 0;
 
 		WorkerPool *pool = pargs->pool;
@@ -201,10 +200,10 @@ static void *dispatcher(void *args)
 				numWorkers = pool->getNumWorkers();
 				if  (numWorkers > 0) {
 						fprintf(stdout, "%d workers: add event to pool - %s \n", numWorkers, targs->name.c_str());
-						tqueue->enQueue(te);
+						pargs->src_queue->enQueue(te);
 				}
 				pool->unlock();
-				usleep(MSECS*500);
+				usleep(MICSECS*50);
 		}
 }
 
